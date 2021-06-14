@@ -1,15 +1,32 @@
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QMessageBox
-from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5 import QtWidgets
+from PyQt5.QtCore import pyqtSignal, Qt, pyqtSlot, QThread
+from PyQt5 import QtWidgets, QtGui
 from PyQt5 import QtCore
 from PIL import ImageGrab
 import configparser
 import win32clipboard
 import sys
+import re
 
+blacklist = re.compile(r'.*[\/:*?"<>|].*', re.DOTALL)
+
+class RemoveStatusBar(QThread):
+    remove = pyqtSignal()
+    time = 2000
+    queue = []
+
+    # 여러 작업이 동시에 시행되었을 때 마지막 이벤트를 기준으로 2 초를 기다리기 위함입니다.
+    def run(self):
+        print("run called, queue", self.queue)
+        self.queue.append("task")
+        self.msleep(self.time)
+        self.queue.pop()
+        print("run end, queue", self.queue)
+        if len(self.queue) == 0:
+            self.remove.emit()
 
 class ClickableLineEdit(QtWidgets.QLineEdit):
-    clicked = pyqtSignal()  # signal when the text entry is left clicked
+    clicked = pyqtSignal()  # 클릭이벤트 시그널
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -32,12 +49,15 @@ class Mainwindow(QMainWindow):
             QMessageBox.information(self, '정보', "config.ini 를 찾을 수 없어 생성했습니다.\n프로그램을 다시 시작해 주세요",
                                  QMessageBox.Yes, QMessageBox.Yes)
             sys.exit(0)
+
         self.setupUi()
 
     def setupUi(self):
         self.resize(878, 254)
         self.setMinimumSize(QtCore.QSize(878, 254))
         self.setMaximumSize(QtCore.QSize(878, 254))
+
+        self.setWindowIcon(QtGui.QIcon("clipboard.jpg"))
 
         self.centralwidget = QtWidgets.QWidget(self)
         self.centralwidget.setObjectName("centralwidget")
@@ -184,6 +204,9 @@ last_filename =
 last_n = 1"""
             f.write(w)
 
+    def clearStatusLabel(self):
+        self.succeed.setText("")
+
     def saveImagePath(self):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.ShowDirsOnly
@@ -217,11 +240,19 @@ last_n = 1"""
         imgname = self.save_filename_input.text() if self.save_filename_input.text().endswith(".png") else self.save_filename_input.text() + ".png"
         imgname = imgname.replace("{n}", self.save_n_input.text())
 
+        if blacklist.match(imgname):
+            QMessageBox.critical(self, '오류', "파일 이름에는 다음의 문자를 사용할 수 없습니다." + "\n" + "\\ / : * ? \" < > |",
+                                 QMessageBox.Yes, QMessageBox.Yes)
+            return
+
         filepath = self.save_imagepath_input.text() + "/" + imgname
         img.save(filepath, 'PNG')
 
         self.save_n_input.setText(str(int(self.save_n_input.text()) + 1))
         self.succeed.setText(imgname + "  저장 성공")
+        self.removeRegister = RemoveStatusBar()
+        self.removeRegister.remove.connect(self.clearStatusLabel)
+        self.removeRegister.start()
 
     def loadImage(self):
         pass
