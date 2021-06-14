@@ -21,10 +21,12 @@ class Mainwindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = configparser.ConfigParser()
-        self.config.read("config.ini")
         try:
+            self.config.read("config.ini")
             print(self.config["DEFAULT"]["last_save_dir"])
             print(self.config["DEFAULT"]["last_load_file"])
+            print(self.config["DEFAULT"]["last_filename"])
+            print(self.config["DEFAULT"]["last_n"])
         except:
             self.initConfig()
             QMessageBox.information(self, '정보', "config.ini 를 찾을 수 없어 생성했습니다.\n프로그램을 다시 시작해 주세요",
@@ -73,6 +75,7 @@ class Mainwindow(QMainWindow):
         self.save_imagepath_input.setObjectName("save_imagepath_input")
         self.save_imagepath_input.clicked.connect(self.saveImagePath)
         self.save_imagepath_input.setText(self.config['DEFAULT']['last_save_dir'])
+        self.save_imagepath_input.setStatusTip("클릭하여 이미지의 저장 경로를 선택합니다.")
         self.gridLayout.addWidget(self.save_imagepath_input, 0, 1, 1, 1)
 
         self.verticalLayout.addLayout(self.gridLayout)
@@ -84,7 +87,8 @@ class Mainwindow(QMainWindow):
         self.save_n_input = QtWidgets.QLineEdit(self.centralwidget)
         self.save_n_input.setMaximumSize(QtCore.QSize(50, 100))
         self.save_n_input.setObjectName("save_n_input")
-        self.save_n_input.setText("1")
+        self.save_n_input.setStatusTip("정수인 파일의 번호를 입력하세요. 파일 이름의 {n}이 이것으로 대체됩니다.")
+        self.save_n_input.setText(self.config['DEFAULT']["last_n"])
 
         self.gridLayout_2.addWidget(self.save_n_input, 0, 1, 1, 1)
         self.info_save_filename_lb = QtWidgets.QLabel(self.centralwidget)
@@ -97,11 +101,14 @@ class Mainwindow(QMainWindow):
 
         self.save_filename_input = QtWidgets.QLineEdit(self.centralwidget)
         self.save_filename_input.setObjectName("save_filename_input")
+        self.save_filename_input.setStatusTip("파일의 이름을 입력하세요. {n} 은 n 에 입력한 값으로 대체됩니다. 형식은 항상 .png 형식입니다.")
+        self.save_filename_input.setText(self.config['DEFAULT']['last_filename'])
 
         self.gridLayout_2.addWidget(self.save_filename_input, 0, 3, 1, 1)
         self.verticalLayout_9.addLayout(self.gridLayout_2)
         self.save_btn = QtWidgets.QPushButton(self.centralwidget)
         self.save_btn.setObjectName("save_btn")
+        self.save_btn.setStatusTip("이미지 저장을 수행합니다.")
         self.save_btn.clicked.connect(self.saveImage)
 
         self.verticalLayout_9.addWidget(self.save_btn)
@@ -128,6 +135,7 @@ class Mainwindow(QMainWindow):
         self.load_imagepath_input = ClickableLineEdit(self.centralwidget)
         self.load_imagepath_input.setObjectName("load_imagepath_input")
         self.load_imagepath_input.setText(self.config['DEFAULT']['last_load_file'])
+        self.load_imagepath_input.setStatusTip("클릭하여 클립보드로 복사할 이미지의 위치를 선택합니다.")
         self.load_imagepath_input.clicked.connect(self.loadImagePath)
 
         self.gridLayout_3.addWidget(self.load_imagepath_input, 0, 1, 1, 1)
@@ -135,6 +143,7 @@ class Mainwindow(QMainWindow):
 
         self.load_btn = QtWidgets.QPushButton(self.centralwidget)
         self.load_btn.setObjectName("load_btn")
+        self.load_btn.setStatusTip("이미지 불러오기를 수행합니다.")
         self.load_btn.clicked.connect(self.loadImage)
 
         self.verticalLayout_5.addWidget(self.load_btn)
@@ -146,6 +155,10 @@ class Mainwindow(QMainWindow):
         self.statusbar = QtWidgets.QStatusBar(self)
         self.statusbar.setObjectName("statusbar")
         self.setStatusBar(self.statusbar)
+        self.statusbar.showMessage("config.ini 로딩에 성공했습니다!", 5000)
+
+        self.succeed = QtWidgets.QLabel(self)
+        self.statusbar.addPermanentWidget(self.succeed)
 
         self.retranslateUi()
         self.show()
@@ -165,18 +178,28 @@ class Mainwindow(QMainWindow):
     def initConfig(self):
         with open("config.ini", 'w') as f:
             w = """[DEFAULT]
-last_save_dir = 
-last_load_file = """
+last_save_dir = C:\\ 
+last_load_file = C:\\
+last_filename = 
+last_n = 1"""
             f.write(w)
 
     def saveImagePath(self):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.ShowDirsOnly
-        filepath = QtWidgets.QFileDialog.getExistingDirectory(self, "저장할 경로를 선택하세요", self.save_filename_input.text())
-        print(filepath)
+        filepath = QtWidgets.QFileDialog.getExistingDirectory(self, "저장할 경로를 선택하세요", self.save_imagepath_input.text())
+
         if not filepath:
             return
+
         self.save_imagepath_input.setText(filepath)
+
+    def loadImagePath(self):
+        fname = QtWidgets.QFileDialog.getOpenFileName(self, '파일 열기', self.load_imagepath_input.text(), "모든 이미지 파일 (*.jpg *.png *.jpeg *.gif)")
+        filepath = fname[0]
+        if not filepath:
+            return
+        self.load_imagepath_input.setText(filepath)
 
     def saveImage(self):
         img = ImageGrab.grabclipboard()
@@ -192,21 +215,33 @@ last_load_file = """
             return
 
         imgname = self.save_filename_input.text() if self.save_filename_input.text().endswith(".png") else self.save_filename_input.text() + ".png"
+        imgname = imgname.replace("{n}", self.save_n_input.text())
 
-        filepath = self.save_imagepath_input.text() + "/" + imgname.replace("{n}", self.save_n_input.text())
+        filepath = self.save_imagepath_input.text() + "/" + imgname
         img.save(filepath, 'PNG')
 
         self.save_n_input.setText(str(int(self.save_n_input.text()) + 1))
-
-    def loadImagePath(self):
-        fname = QtWidgets.QFileDialog.getOpenFileName(self, '파일 열기', self.load_imagepath_input.text(), "모든 이미지 파일 (*.jpg *.png *.jpeg *.gif)")
-        filepath = fname[0]
-        if not filepath:
-            return
-        self.load_imagepath_input.setText(filepath)
+        self.succeed.setText(imgname + "  저장 성공")
 
     def loadImage(self):
         pass
+
+    def closeEvent(self, QCloseEvent):
+        last_save_dir = self.save_imagepath_input.text()
+        last_load_file = self.load_imagepath_input.text()
+        last_filename = self.save_filename_input.text()
+        last_n = self.save_n_input.text()
+
+        self.config["DEFAULT"] = {
+            'last_save_dir': last_save_dir,
+            'last_load_file': last_load_file,
+            'last_filename': last_filename,
+            'last_n': last_n
+        }
+
+        with open("config.ini", 'w') as f:
+            self.config.write(f)
+
 
 app = QApplication(sys.argv)
 w = Mainwindow()
