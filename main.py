@@ -38,18 +38,36 @@ class ClickableLineEdit(QtWidgets.QLineEdit):
 class Mainwindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        try:
+            open("resources/clipboard.jpg").close()
+        except:
+            ans = QMessageBox.critical(self, "오류", "clipboard.jpg 를 찾을 수 없습니다. \n프로그램이 실행되어도 바르게 동작하지 않을 수 있습니다. 실행하시겠습니까?",
+                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if ans == QMessageBox.No:
+                sys.exit(0)
+        self.setWindowIcon(QtGui.QIcon("resources/clipboard.jpg"))
+
         self.config = configparser.ConfigParser()
+
+        try:
+            open("config.ini", 'r').close()
+        except FileNotFoundError:
+            self.initConfig()
+            QMessageBox.information(self, '정보', "config.ini 를 찾을 수 없어 생성했습니다.\n일부 설정이 초기화되었을 수 있습니다.",
+                                 QMessageBox.Yes, QMessageBox.Yes)
+
         try:
             self.config.read("config.ini")
             print(self.config["DEFAULT"]["last_save_dir"])
             print(self.config["DEFAULT"]["last_load_file"])
             print(self.config["DEFAULT"]["last_filename"])
             print(self.config["DEFAULT"]["last_n"])
-        except:
+        except KeyError:
             self.initConfig()
-            QMessageBox.information(self, '정보', "config.ini 를 찾을 수 없어 생성했습니다.\n프로그램을 다시 시작해 주세요",
+            QMessageBox.information(self, '정보', "config.ini 가 손상되어 복구했습니다.\n일부 설정이 초기화되었을 수 있습니다.",
                                  QMessageBox.Yes, QMessageBox.Yes)
-            sys.exit(0)
+            self.config.read("config.ini")
 
         self.setupUi()
 
@@ -57,8 +75,6 @@ class Mainwindow(QMainWindow):
         self.resize(878, 254)
         self.setMinimumSize(QtCore.QSize(878, 254))
         self.setMaximumSize(QtCore.QSize(878, 254))
-
-        self.setWindowIcon(QtGui.QIcon("clipboard.jpg"))
 
         self.centralwidget = QtWidgets.QWidget(self)
         self.centralwidget.setObjectName("centralwidget")
@@ -197,13 +213,25 @@ class Mainwindow(QMainWindow):
         self.load_btn.setText(_translate("MainWindow", "불러오기"))
 
     def initConfig(self):
-        with open("config.ini", 'w') as f:
-            w = """[DEFAULT]
-last_save_dir = C:\\ 
-last_load_file = C:\\
-last_filename = 
-last_n = 1"""
-            f.write(w)
+        try:
+            open("resources/default.backup.ini", 'r').close()
+        except FileNotFoundError:
+            QMessageBox.critical(self, '오류',
+                                 "resources\\default.backup.ini 파일이 존재하지 않습니다.\n프로그램을 시작할 수 없습니다. 프로그램을 다시 설치하면 문제가 해결될 수도 있습니다.",
+                                 QMessageBox.Yes, QMessageBox.Yes)
+            sys.exit(0)
+        self.config.read("resources/default.backup.ini")
+        try:
+            print(self.config["DEFAULT"]["last_save_dir"])
+            print(self.config["DEFAULT"]["last_load_file"])
+            print(self.config["DEFAULT"]["last_filename"])
+            print(self.config["DEFAULT"]["last_n"])
+        except KeyError:
+            QMessageBox.critical(self, '오류', "resources\\default.backup.ini 파일이 올바르지 않습니다.\n프로그램을 시작할 수 없습니다. 프로그램을 다시 설치하면 문제가 해결될 수도 있습니다.",
+                                 QMessageBox.Yes, QMessageBox.Yes)
+            sys.exit(0)
+        with open("config.ini", "w") as f:
+            self.config.write(f)
 
     def clearStatusLabel(self):
         self.succeed.setText("")
@@ -233,12 +261,12 @@ last_n = 1"""
         img = ImageGrab.grabclipboard()
 
         if not img:
-            QMessageBox.critical(self, '오류', "클립보드의 내용물이 이미지가 아닙니다.\n이미지 복사 후 다시 시도해 주세요",
+            QMessageBox.warning(self, '오류', "클립보드의 내용물이 이미지가 아닙니다.\n이미지 복사 후 다시 시도해 주세요",
                                  QMessageBox.Yes, QMessageBox.Yes)
             return
 
         if not self.save_n_input.text().isdigit():
-            QMessageBox.critical(self, '오류', "n의 값이 정수가 아닙니다." + "\n" + "n의 값을 다시 입력해 주세요",
+            QMessageBox.warning(self, '오류', "n의 값이 정수가 아닙니다." + "\n" + "n의 값을 다시 입력해 주세요",
                                  QMessageBox.Yes, QMessageBox.Yes)
             return
 
@@ -246,7 +274,7 @@ last_n = 1"""
         imgname = imgname.replace("{n}", self.save_n_input.text())
 
         if blacklist.match(imgname):
-            QMessageBox.critical(self, '오류', "파일 이름에는 다음의 문자를 사용할 수 없습니다." + "\n" + "\\ / : * ? \" < > |",
+            QMessageBox.warning(self, '오류', "파일 이름에는 다음의 문자를 사용할 수 없습니다." + "\n" + "\\ / : * ? \" < > |",
                                  QMessageBox.Yes, QMessageBox.Yes)
             return
 
