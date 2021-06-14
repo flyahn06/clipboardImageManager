@@ -202,7 +202,7 @@ class Mainwindow(QMainWindow):
 
     def retranslateUi(self):
         _translate = QtCore.QCoreApplication.translate
-        self.setWindowTitle(_translate("MainWindow", "클립보드 이미지 메니저"))
+        self.setWindowTitle(_translate("MainWindow", "클립보드 이미지 매니저"))
         self.info_imgsave_lb.setText(_translate("MainWindow", "    이미지 저장   "))
         self.info_save_imagepath_lb.setText(_translate("MainWindow", "파일 경로"))
         self.info_save_filename_lb.setText(_translate("MainWindow", "파일 이름"))
