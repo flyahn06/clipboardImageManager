@@ -2,9 +2,10 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QMessageB
 from PyQt5.QtCore import pyqtSignal, Qt, pyqtSlot, QThread
 from PyQt5 import QtWidgets, QtGui
 from PyQt5 import QtCore
-from PIL import ImageGrab
-import configparser
+from PIL import ImageGrab, Image
+from io import BytesIO
 import win32clipboard
+import configparser
 import sys
 import re
 
@@ -207,6 +208,10 @@ last_n = 1"""
     def clearStatusLabel(self):
         self.succeed.setText("")
 
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key_Return or e.key() == Qt.Key_Enter:
+            self.saveImage()
+
     def saveImagePath(self):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.ShowDirsOnly
@@ -255,7 +260,28 @@ last_n = 1"""
         self.removeRegister.start()
 
     def loadImage(self):
-        pass
+        filepath = self.load_imagepath_input.text()
+        image = Image.open(filepath)
+
+        output = BytesIO()
+
+        try:
+            image.convert("RGB").save(output, "BMP")
+            data = output.getvalue()[14:]
+            output.close()
+        except:
+            QMessageBox.critical(self, '오류', "파일 크기가 너무 큽니다",
+                                 QMessageBox.Yes, QMessageBox.Yes)
+
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
+        win32clipboard.CloseClipboard()
+
+        self.succeed.setText(filepath + "  불러오기 성공")
+        self.removeRegister = RemoveStatusBar()
+        self.removeRegister.remove.connect(self.clearStatusLabel)
+        self.removeRegister.start()
 
     def closeEvent(self, QCloseEvent):
         last_save_dir = self.save_imagepath_input.text()
